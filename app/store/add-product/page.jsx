@@ -1,0 +1,140 @@
+'use client'
+import { assets } from "@/assets/assets"
+import Image from "next/image"
+import { useState } from "react"
+import { toast } from "react-hot-toast"
+import { CldUploadWidget } from 'next-cloudinary';
+
+export default function StoreAddProduct() {
+
+    const categories = ['Electronics', 'Clothing', 'Home & Kitchen', 'Beauty & Health', 'Toys & Games', 'Sports & Outdoors', 'Books & Media', 'Food & Drink', 'Hobbies & Crafts', 'Others']
+
+    const [images, setImages] = useState([])
+    const [productInfo, setProductInfo] = useState({
+        name: "",
+        description: "",
+        mrp: 0,
+        price: 0,
+        category: "",
+    })
+    const [loading, setLoading] = useState(false)
+
+
+    const onChangeHandler = (e) => {
+        setProductInfo({ ...productInfo, [e.target.name]: e.target.value })
+    }
+
+    const onSubmitHandler = async (e) => {
+        e.preventDefault()
+        setLoading(true);
+
+        const imageUrls = [];
+
+        for (const image of images) {
+            const formData = new FormData();
+            formData.append('file', image);
+            formData.append('upload_preset', 'gocart'); // Create an upload preset in your Cloudinary account
+
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            imageUrls.push(data.secure_url);
+        }
+
+        const productData = {
+            ...productInfo,
+            images: imageUrls
+        };
+
+        const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(productData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            toast.success('Product added successfully');
+            setImages([]);
+            setProductInfo({
+                name: "",
+                description: "",
+                mrp: 0,
+                price: 0,
+                category: "",
+            });
+        } else {
+            toast.error(data.message || 'Something went wrong');
+        }
+
+        setLoading(false);
+    }
+
+
+    return (
+        <form onSubmit={e => toast.promise(onSubmitHandler(e), { loading: "Adding Product..." })} className="text-slate-500 mb-28">
+            <h1 className="text-2xl">Add New <span className="text-slate-800 font-medium">Products</span></h1>
+            <p className="mt-7">Product Images</p>
+
+            <div htmlFor="" className="flex gap-3 mt-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                    <CldUploadWidget
+                        key={index}
+                        uploadPreset="gocart" // Create an upload preset in your Cloudinary account
+                        onSuccess={(result) => {
+                            setImages(prevImages => [...prevImages, result.info.secure_url]);
+                        }}
+                    >
+                        {({ open }) => (
+                            <button type="button" onClick={() => open()} className="border border-slate-200 rounded cursor-pointer">
+                                {images[index] ? (
+                                    <Image width={300} height={300} className='h-15 w-auto' src={images[index]} alt="" />
+                                ) : (
+                                    <Image width={300} height={300} className='h-15 w-auto' src={assets.upload_area} alt="" />
+                                )}
+                            </button>
+                        )}
+                    </CldUploadWidget>
+                ))}
+            </div>
+
+            <label htmlFor="" className="flex flex-col gap-2 my-6 ">
+                Name
+                <input type="text" name="name" onChange={onChangeHandler} value={productInfo.name} placeholder="Enter product name" className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded" required />
+            </label>
+
+            <label htmlFor="" className="flex flex-col gap-2 my-6 ">
+                Description
+                <textarea name="description" onChange={onChangeHandler} value={productInfo.description} placeholder="Enter product description" rows={5} className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
+            </label>
+
+            <div className="flex gap-5">
+                <label htmlFor="" className="flex flex-col gap-2 ">
+                    Actual Price ($)
+                    <input type="number" name="mrp" onChange={onChangeHandler} value={productInfo.mrp} placeholder="0" rows={5} className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
+                </label>
+                <label htmlFor="" className="flex flex-col gap-2 ">
+                    Offer Price ($)
+                    <input type="number" name="price" onChange={onChangeHandler} value={productInfo.price} placeholder="0" rows={5} className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
+                </label>
+            </div>
+
+            <select onChange={e => setProductInfo({ ...productInfo, category: e.target.value })} value={productInfo.category} className="w-full max-w-sm p-2 px-4 my-6 outline-none border border-slate-200 rounded" required>
+                <option value="">Select a category</option>
+                {categories.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                ))}
+            </select>
+
+            <br />
+
+            <button disabled={loading} className="bg-slate-800 text-white px-6 mt-7 py-2 hover:bg-slate-900 rounded transition">Add Product</button>
+        </form>
+    )
+}
