@@ -3,6 +3,8 @@ import Image from "next/image";
 import { MapPin, Mail, Phone } from "lucide-react";
 
 const StoreInfo = ({ store }) => {
+  console.log(store);
+
   return (
     <div className="flex-1 space-y-2 text-sm">
       <Image

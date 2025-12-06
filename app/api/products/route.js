@@ -1,7 +1,51 @@
 import dbConnect from "@/lib/dbConnect";
 import Product from "@/lib/models/Product";
+import User from "@/lib/models/user"; // Import User model
+import jwt from "jsonwebtoken"; // Import jwt
+import { cookies } from "next/headers"; // Import cookies
 
 export const dynamic = "force-dynamic";
+
+// Helper function to get storeId from authenticated user
+async function getStoreIdFromAuth() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token");
+
+  if (!token) {
+    return { error: "Not authorized", status: 401 };
+  }
+
+  try {
+    const decoded = jwt.verify(token.value, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).populate("store"); // Populate store
+
+    console.log("Authenticated user:", user);
+    if (!user) {
+      return { error: "User not found", status: 404 };
+    }
+
+    if (user.role !== "vendor" || !user.store) {
+      return {
+        error:
+          "Unauthorized: Only vendors with an associated store can add products",
+        status: 403,
+      };
+    }
+
+    if (user.store.status !== "approved") {
+      return {
+        error:
+          "Forbidden: Your store is not yet approved. Please wait for approval.",
+        status: 403,
+      };
+    }
+
+    return { storeId: user.store._id.toString() };
+  } catch (error) {
+    console.error("Authentication error:", error);
+    return { error: "Not authorized", status: 401 };
+  }
+}
 
 export async function GET(req) {
   await dbConnect();
@@ -16,8 +60,15 @@ export async function GET(req) {
   const limit = Number(searchParams.get("limit") || 20);
   const sort = searchParams.get("sort") || "-createdAt";
 
+  const priceFilter = {};
+  if (minPrice > 0) {
+    priceFilter.$gte = minPrice;
+  }
+  if (maxPrice < Number.MAX_SAFE_INTEGER) {
+    priceFilter.$lte = maxPrice;
+  }
+
   const filter = {
-    price: { $gte: minPrice, $lte: maxPrice },
     ...(category ? { category } : {}),
     ...(q
       ? {
@@ -28,6 +79,13 @@ export async function GET(req) {
         }
       : {}),
   };
+
+  if (Object.keys(priceFilter).length > 0) {
+    filter.$or = [
+      { price: priceFilter }, // For products without variations
+      { "variations.price": priceFilter }, // For products with variations
+    ];
+  }
 
   const [items, total] = await Promise.all([
     Product.find(filter)
@@ -43,6 +101,12 @@ export async function GET(req) {
 
 export async function POST(req) {
   await dbConnect();
+
+  const { storeId, error, status } = await getStoreIdFromAuth();
+  if (error) {
+    return new Response(JSON.stringify({ message: error }), { status });
+  }
+
   const body = await req.json();
   const {
     name,
@@ -51,45 +115,119 @@ export async function POST(req) {
     price,
     images,
     category,
-    inStock,
-    stockQty,
-    storeId,
-    tags,
+    hasVariations, // New field
+    variations, // New field
   } = body;
+  // Basic validation
 
-  if (
-    !name ||
-    !description ||
-    mrp == null ||
-    price == null ||
-    !category ||
-    !Array.isArray(images) ||
-    images.length === 0
-  ) {
+  console.log("Creating product with data:", body);
+  if (!name || !description || !category) {
     return new Response(
-      JSON.stringify({ message: "Missing required fields" }),
-      { status: 400 }
-    );
-  }
-  if (price > mrp) {
-    return new Response(
-      JSON.stringify({ message: "Price cannot exceed MRP" }),
+      JSON.stringify({
+        message: "Missing required fields: name, description, category, images",
+      }),
       { status: 400 }
     );
   }
 
-  const created = await Product.create({
+  if (hasVariations) {
+    if (!Array.isArray(variations) || variations.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Variations are required when hasVariations is true",
+        }),
+        { status: 400 }
+      );
+    }
+    for (const variation of variations) {
+      if (
+        !Array.isArray(variation.attributes) ||
+        variation.attributes.length === 0 ||
+        !variation.price
+      ) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Each variation must have attributes and price",
+          }),
+          { status: 400 }
+        );
+      }
+      for (const attr of variation.attributes) {
+        if (!attr.name || !attr.value) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: "Each variation attribute must have a name and value",
+            }),
+            { status: 400 }
+          );
+        }
+      }
+    }
+  } else {
+    // If no variations, mrp and price are required
+    const numericMrp = Number(mrp);
+    const numericPrice = Number(price);
+
+    if (
+      numericMrp == null ||
+      numericPrice == null ||
+      isNaN(numericMrp) ||
+      isNaN(numericPrice)
+    ) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message:
+            "Missing required fields: mrp, price (for products without variations)",
+        }),
+        { status: 400 }
+      );
+    }
+    if (numericPrice > numericMrp) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "Price cannot exceed MRP (for products without variations)",
+        }),
+        { status: 400 }
+      );
+    }
+  }
+
+  const productData = {
     name: name.trim(),
     description,
-    mrp: Number(mrp),
-    price: Number(price),
     images,
     category,
-    inStock: !!inStock,
-    stockQty: Number(stockQty || 0),
-    storeId,
-    tags: Array.isArray(tags) ? tags : [],
-  });
+    store: storeId, // Use 'store' field now
+  };
 
-  return new Response(JSON.stringify(created), { status: 201 });
+  if (hasVariations) {
+    productData.variations = variations;
+    // Calculate overall stock and price range from variations if needed for search/display purposes
+    // For simplicity, not doing this automatically now, relying on frontend to manage
+  } else {
+    productData.mrp = Number(mrp);
+    productData.price = Number(price);
+  }
+
+  try {
+    const created = await Product.create(productData);
+    return new Response(JSON.stringify({ success: true, product: created }), {
+      status: 201,
+    });
+  } catch (error) {
+    console.error("Error creating product:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: "Failed to create product",
+        error: error.message,
+      }),
+      { status: 500 }
+    );
+  }
 }

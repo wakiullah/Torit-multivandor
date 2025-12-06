@@ -3,23 +3,51 @@ import { usePathname } from "next/navigation"
 import { HomeIcon, LayoutListIcon, SquarePenIcon, SquarePlusIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 
-const StoreSidebar = ({storeInfo}) => {
-
-    const pathname = usePathname()
+const StoreSidebar = () => {
+    const pathname = usePathname();
+    const [store, setStore] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const sidebarLinks = [
         { name: 'Dashboard', href: '/store', icon: HomeIcon },
         { name: 'Add Product', href: '/store/add-product', icon: SquarePlusIcon },
         { name: 'Manage Product', href: '/store/manage-product', icon: SquarePenIcon },
         { name: 'Orders', href: '/store/orders', icon: LayoutListIcon },
-    ]
+    ];
+
+    useEffect(() => {
+        const fetchStore = async () => {
+            try {
+                const response = await fetch('/api/stores/my-store');
+                const data = await response.json();
+                if (response.ok) {
+                    setStore(data.store);
+                }
+            } catch (error) {
+                console.error("Failed to fetch store info", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStore();
+    }, []);
 
     return (
         <div className="inline-flex h-full flex-col gap-5 border-r border-slate-200 sm:min-w-60">
             <div className="flex flex-col gap-3 justify-center items-center pt-8 max-sm:hidden">
-                <Image className="w-14 h-14 rounded-full shadow-md" src={storeInfo?.logo} alt="" width={80} height={80} />
-                <p className="text-slate-700">{storeInfo?.name}</p>
+                {loading ? (
+                    <div className="w-14 h-14 rounded-full bg-slate-200 animate-pulse" />
+                ) : store ? (
+                    <>
+                        <Image className="w-14 h-14 rounded-full shadow-md" src={store.image} alt={store.name} width={80} height={80} />
+                        <p className="text-slate-700">{store.name}</p>
+                    </>
+                ) : (
+                    <p className="text-slate-500">No store found</p>
+                )}
             </div>
 
             <div className="max-sm:mt-6">
@@ -37,4 +65,4 @@ const StoreSidebar = ({storeInfo}) => {
     )
 }
 
-export default StoreSidebar
+export default StoreSidebar;

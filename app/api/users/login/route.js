@@ -3,8 +3,8 @@ import User from '@/lib/models/user';
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-const generateToken = (id, role) => {
-    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+const generateToken = (id, role, storeId = null, storeStatus = null) => {
+    return jwt.sign({ id, role, storeId, storeStatus }, process.env.JWT_SECRET, {
         expiresIn: '30d',
     });
 };
@@ -21,16 +21,25 @@ export async function POST(req) {
         );
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select('+password').populate('store'); // Populate store here
 
     if (user && (await user.matchPassword(password))) {
-        const token = generateToken(user._id, user.role);
+        let storeId = null;
+        let storeStatus = null;
+
+        if (user.role === 'vendor' && user.store) {
+            storeId = user.store._id;
+            storeStatus = user.store.status;
+        }
+
+        const token = generateToken(user._id, user.role, storeId, storeStatus);
         const response = NextResponse.json(
             {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                store: user.store ? { _id: user.store._id, status: user.store.status } : null, // Include store info in response
                 token,
             },
             { status: 200 }

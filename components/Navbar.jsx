@@ -14,8 +14,6 @@ const Navbar = () => {
   const { user } = useSelector((state) => state.user);
   const cartCount = useSelector((state) => state.cart.total);
 
-  console.log("user", user);
-
   const handleSearch = (e) => {
     e.preventDefault();
     router.push(`/shop?search=${search}`);
@@ -23,8 +21,8 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
+      await fetch("/api/auth/logout", {
+        method: "POST",
       });
       toast.success("Logged out successfully");
       dispatch(clearUser());

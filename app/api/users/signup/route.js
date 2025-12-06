@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-const generateToken = (id, role) => {
-    return jwt.sign({ id, role }, process.env.JWT_SECRET, {
+const generateToken = (id, role, storeId = null, storeStatus = null) => {
+    return jwt.sign({ id, role, storeId, storeStatus }, process.env.JWT_SECRET, {
         expiresIn: '30d',
     });
 };
@@ -38,13 +38,14 @@ export async function POST(req) {
     });
 
     if (user) {
-        const token = generateToken(user._id, user.role);
+        const token = generateToken(user._id, user.role, null, null); // Pass null for storeId and storeStatus
         const response = NextResponse.json(
             {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                store: null, // New users don't have a store yet
                 token,
             },
             { status: 201 }
