@@ -1,32 +1,31 @@
 "use client";
+
 import {
-  addToCart,
-  deleteItemFromCart,
-  removeFromCart,
+  incrementQuantity,
+  decrementQuantity,
 } from "@/lib/features/cart/cartSlice";
+import { MinusIcon, PlusIcon } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 
-const Counter = ({ productId }) => {
-  const { cartItems } = useSelector((state) => state.cart);
-
+const Counter = ({ cartItemId }) => {
   const dispatch = useDispatch();
+  const item = useSelector((state) => state.cart.cartItems[cartItemId]);
 
-  const addToCartHandler = () => {
-    dispatch(addToCart({ productId }));
-  };
-
-  const removeFromCartHandler = () => {
-    dispatch(deleteItemFromCart({ productId }));
-  };
+  // If item is not in cart, don't render the counter
+  if (!item) {
+    return null;
+  }
 
   return (
-    <div className="inline-flex items-center gap-1 sm:gap-3 px-3 py-1 rounded border border-slate-200 max-sm:text-sm text-slate-600">
-      <button onClick={removeFromCartHandler} className="p-1 select-none">
-        -
+    <div className="flex items-center gap-3 border border-gray-300 rounded-md px-3 py-1.5">
+      <button onClick={() => dispatch(decrementQuantity(cartItemId))}>
+        <MinusIcon size={16} className="text-slate-600" />
       </button>
-      <p className="p-1">{cartItems[productId]}</p>
-      <button onClick={addToCartHandler} className="p-1 select-none">
-        +
+      <p className="font-semibold text-slate-800 w-4 text-center">
+        {item.quantity}
+      </p>
+      <button onClick={() => dispatch(incrementQuantity(cartItemId))}>
+        <PlusIcon size={16} className="text-slate-600" />
       </button>
     </div>
   );

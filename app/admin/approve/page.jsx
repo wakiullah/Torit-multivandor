@@ -35,7 +35,7 @@ export default function AdminApprove() {
                     {stores.map((store) => (
                         <div key={store.id} className="bg-white border rounded-lg shadow-sm p-6 flex max-md:flex-col gap-4 md:items-end max-w-4xl" >
                             {/* Store Info */}
-                            <StoreInfo store={store} />
+                            {/* <StoreInfo store={store} /> */}
 
                             {/* Actions */}
                             <div className="flex gap-3 pt-2 flex-wrap">

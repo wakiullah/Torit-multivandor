@@ -32,10 +32,20 @@ const ProductDetails = ({ product }) => {
     product.images?.[0] || "/placeholder.png"
   );
 
+  const hasVariations = product.variations && product.variations.length > 0;
+
   const addToCartHandler = () => {
-    if (selectedVariation) {
-      // Pass the whole product and the selected variation to the action
-      dispatch(addToCart({ product, selectedVariation, quantity: 1 }));
+    // If there are variations, a variation must be selected.
+    // If there are no variations, we can add the product directly.
+    if ((hasVariations && selectedVariation) || !hasVariations) {
+      dispatch(
+        addToCart({
+          product,
+          // If there's a selected variation, pass it, otherwise pass null
+          selectedVariation: hasVariations ? selectedVariation : null,
+          quantity: 1,
+        })
+      );
     }
   };
 
@@ -45,13 +55,16 @@ const ProductDetails = ({ product }) => {
         product.rating.length
       : 0;
 
-  const price = selectedVariation?.price;
-  const mrp = selectedVariation?.mrp;
+  // Use product's own price if no variations exist
+  const price = hasVariations ? selectedVariation?.price : product.price;
+  const mrp = hasVariations ? selectedVariation?.mrp : product.mrp;
 
   // Generate a unique ID for the cart item to check if it exists
-  const cartItemId = selectedVariation
-    ? `${productId}_${selectedVariation._id}`
-    : null;
+  const cartItemId = hasVariations
+    ? selectedVariation
+      ? `${productId}_${selectedVariation._id}`
+      : null
+    : productId;
 
   return (
     <div className="flex max-lg:flex-col gap-12">
@@ -73,8 +86,13 @@ const ProductDetails = ({ product }) => {
             </div>
           ))}
         </div>
-        <div className="flex justify-center items-center h-100 sm:size-113 bg-slate-100 rounded-lg ">
-          <Image src={mainImage} alt={product.name} width={500} height={500} />
+        <div className="relative h-100 sm:size-113 bg-slate-100 rounded-lg overflow-hidden">
+          <Image
+            src={mainImage}
+            alt={product.name}
+            fill
+            className="object-contain"
+          />
         </div>
       </div>
       <div className="flex-1">

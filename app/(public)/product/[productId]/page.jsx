@@ -14,12 +14,29 @@ export default function Product() {
   const { fetchProducts } = useProducts();
 
   const findProduct = () => {
-    const product = products.find(
-      (product) => (product.id || product._id) === productId
-    );
-    setProduct(product);
+    // Find product from Redux store using only _id
+    const foundProduct = products.find((p) => p._id === productId);
+    if (foundProduct) {
+      setProduct(foundProduct);
+    } else if (products.length > 0) {
+      // If not found in store, fetch directly from API
+      fetchProductById();
+    }
   };
-  console.log("id", product);
+
+  const fetchProductById = async () => {
+    try {
+      const response = await fetch(`/api/products/${productId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProduct(data.product);
+      } else {
+        console.error("Product not found via API");
+      }
+    } catch (error) {
+      console.error("Failed to fetch product by ID", error);
+    }
+  };
 
   useEffect(() => {
     if (products.length === 0) {
@@ -27,14 +44,13 @@ export default function Product() {
     } else {
       findProduct();
     }
-    scrollTo(0, 0);
   }, [productId, products]);
 
   if (!product) return <Loading />;
 
   return (
     product && (
-      <div className="mx-6">
+      <div className="mx-3">
         <div className="max-w-7xl mx-auto">
           {/* Breadcrums */}
           <div className="  text-gray-600 text-sm mt-8 mb-5">

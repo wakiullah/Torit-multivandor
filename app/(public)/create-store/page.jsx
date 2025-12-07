@@ -10,6 +10,7 @@ export default function CreateStore() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [locations, setLocations] = useState([]);
 
   const [storeInfo, setStoreInfo] = useState({
     name: "",
@@ -18,6 +19,7 @@ export default function CreateStore() {
     email: "",
     contact: "",
     address: "",
+    location: "",
     image: "",
   });
 
@@ -46,6 +48,17 @@ export default function CreateStore() {
     setLoading(false);
   };
 
+  const fetchLocations = async () => {
+    try {
+      const response = await fetch("/api/locations");
+      const data = await response.json();
+      if (data.success) {
+        setLocations(data.locations);
+      }
+    } catch (error) {
+      console.error("Failed to fetch locations", error);
+    }
+  };
   const onSubmitHandler = async (e) => {
     e.preventDefault();
     const formData = new FormData();
@@ -55,9 +68,10 @@ export default function CreateStore() {
     formData.append("email", storeInfo.email);
     formData.append("contact", storeInfo.contact);
     formData.append("address", storeInfo.address);
+    formData.append("location", storeInfo.location);
     formData.append("image", storeInfo.image);
 
-    const response = await fetch("/api/stores", {
+    const response = await fetch("/api/store", {
       method: "POST",
       body: formData,
     });
@@ -75,6 +89,7 @@ export default function CreateStore() {
 
   useEffect(() => {
     fetchSellerStatus();
+    fetchLocations(); // কম্পোনেন্ট লোড হওয়ার সময় লোকেশন ফেচ করুন
   }, []);
 
   return !loading ? (
@@ -179,6 +194,22 @@ export default function CreateStore() {
               placeholder="Enter your store address"
               className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded resize-none"
             />
+
+            <p>Shop Location</p>
+            <select
+              name="location"
+              onChange={onChangeHandler}
+              value={storeInfo.location}
+              required
+              className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded bg-white"
+            >
+              <option value="">Select a location</option>
+              {locations.map((loc) => (
+                <option key={loc._id} value={loc._id}>
+                  {loc.name}
+                </option>
+              ))}
+            </select>
 
             <button className="bg-slate-800 text-white px-12 py-2 rounded mt-10 mb-40 active:scale-95 hover:bg-slate-900 transition ">
               Submit

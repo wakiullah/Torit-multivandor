@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 import { clearUser } from "@/lib/features/user/userSlice";
+import { rehydrateCart } from "@/lib/features/cart/cartSlice";
 
 const Navbar = () => {
   const router = useRouter();
@@ -14,7 +15,17 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const { user } = useSelector((state) => state.user);
-  const cartCount = useSelector((state) => state.cart.total);
+  const { cartItems } = useSelector((state) => state.cart);
+
+  // Rehydrate cart on initial client-side load
+  useEffect(() => {
+    dispatch(rehydrateCart());
+  }, [dispatch]);
+
+  const cartCount = Object.values(cartItems).reduce(
+    (acc, item) => acc + item.quantity,
+    0
+  );
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -77,9 +88,11 @@ const Navbar = () => {
             >
               <ShoppingCart size={18} />
               Cart
-              <button className="absolute -top-1 left-3 text-[8px] text-white bg-slate-600 size-3.5 rounded-full">
-                {cartCount}
-              </button>
+              {cartCount > 0 && (
+                <span className="absolute -top-2 left-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
             </Link>
             {user ? (
               <div className="flex items-center gap-4">
@@ -113,9 +126,11 @@ const Navbar = () => {
               className="relative flex items-center gap-2 text-slate-600"
             >
               <ShoppingCart size={20} />
-              <button className="absolute -top-1 -left-1 text-[8px] text-white bg-slate-600 size-3.5 rounded-full">
-                {cartCount}
-              </button>
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
             </Link>
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}

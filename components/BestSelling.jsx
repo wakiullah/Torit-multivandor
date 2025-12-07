@@ -25,13 +25,13 @@ const BestProducts = () => {
   }, [products]);
 
   return (
-    <div className="px-2 my-12 max-w-6xl mx-auto">
+    <div className="px-2 mt-12 max-w-6xl mx-auto">
       <Title
         title="Best Selling"
         description={`Showing ${randomProducts.length} of ${products.length} products`}
         href="/shop"
       />
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 gap-y-10 xl:gap-12 mx-auto mb-32">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 gap-y-10 xl:gap-12 mx-auto">
         {randomProducts.map((product, index) => (
           <ProductCard key={product.id || product._id} product={product} />
         ))}

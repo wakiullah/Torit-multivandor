@@ -9,12 +9,12 @@ const Title = ({ title, description, visibleButton = true, href = "" }) => {
       <h2 className="text-2xl font-semibold text-slate-800">{title}</h2>
       <Link
         href={href}
-        className="text-center items-center gap-5 text-sm text-slate-600 mt-2"
+        className="text-center  items-center gap-4 text-sm text-slate-600 mt-2"
       >
         <p className="max-w-lg text-center">{description}</p>
         <br />
         {visibleButton && (
-          <button className="text-green-500 flex items-center gap-1 text-center">
+          <button className="text-green-500 mx-auto flex items-center gap-1 text-center mb-2">
             View more <ArrowRight size={14} />
           </button>
         )}
