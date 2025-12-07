@@ -87,14 +87,46 @@ export async function GET(req) {
     ];
   }
 
-  const [items, total] = await Promise.all([
-    Product.find(filter)
+  let items;
+  const total = await Product.countDocuments(filter);
+
+  if (sort === "random") {
+    // Shuffle the products using aggregation pipeline
+    items = await Product.aggregate([
+      { $match: filter },
+      // Get 'limit' number of random documents
+      { $sample: { size: limit } },
+      // Manually populate store data since .populate() is not available in aggregate
+      {
+        $lookup: {
+          from: "stores", // The actual name of the stores collection in MongoDB
+          localField: "store",
+          foreignField: "_id",
+          as: "storeInfo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$storeInfo",
+          preserveNullAndEmptyArrays: true, // Keep products even if they don't have a store
+        },
+      },
+      {
+        $addFields: {
+          store: "$storeInfo", // Reshape to match the .populate() structure
+        },
+      },
+      { $project: { storeInfo: 0 } }, // Clean up the temporary field
+    ]);
+  } else {
+    // Use standard find with sort and pagination
+    items = await Product.find(filter)
+      .populate("store", "name image _id username")
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
-      .lean(),
-    Product.countDocuments(filter),
-  ]);
+      .lean();
+  }
 
   return Response.json({ items, total, page, pages: Math.ceil(total / limit) });
 }

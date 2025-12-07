@@ -1,5 +1,5 @@
 "use client";
-import { Search, ShoppingCart, User } from "lucide-react";
+import { Search, ShoppingCart, User, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -11,6 +11,8 @@ const Navbar = () => {
   const router = useRouter();
   const dispatch = useDispatch();
   const [search, setSearch] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const { user } = useSelector((state) => state.user);
   const cartCount = useSelector((state) => state.cart.total);
 
@@ -38,9 +40,9 @@ const Navbar = () => {
         <div className="flex items-center justify-between max-w-7xl mx-auto py-4  transition-all">
           <Link
             href="/"
-            className="relative text-4xl font-semibold text-slate-700"
+            className="relative text-3xl sm:text-4xl font-semibold text-slate-700"
           >
-            <span className="text-green-600">go</span>cart
+            <span className="text-green-600 ">go</span>cart
             <span className="text-green-600 text-5xl leading-0">.</span>
             <p className="absolute text-xs font-semibold -top-1 -right-8 px-3 p-0.5 rounded-full flex items-center gap-2 text-white bg-green-500">
               plus
@@ -101,24 +103,84 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile User Button  */}
-          <div className="sm:hidden">
-            {user ? (
-              <button
-                onClick={handleLogout}
-                className="px-7 py-1.5 bg-red-500 hover:bg-red-600 text-sm transition text-white rounded-full"
-              >
-                Logout
+          {/* Mobile Menu */}
+          <div className="sm:hidden flex items-center gap-4">
+            <button onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}>
+              <Search size={20} className="text-slate-600" />
+            </button>
+            <Link
+              href="/cart"
+              className="relative flex items-center gap-2 text-slate-600"
+            >
+              <ShoppingCart size={20} />
+              <button className="absolute -top-1 -left-1 text-[8px] text-white bg-slate-600 size-3.5 rounded-full">
+                {cartCount}
               </button>
-            ) : (
-              <Link href="/auth/login">
-                <button className="px-7 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-sm transition text-white rounded-full">
-                  Login
-                </button>
-              </Link>
-            )}
+            </Link>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Search Bar */}
+        {isMobileSearchOpen && (
+          <form
+            onSubmit={handleSearch}
+            className="sm:hidden flex items-center w-full text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full mb-3"
+          >
+            <Search size={18} className="text-slate-600" />
+            <input
+              className="w-full bg-transparent outline-none placeholder-slate-600"
+              type="text"
+              placeholder="Search products"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              required
+            />
+          </form>
+        )}
+
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="sm:hidden absolute top-full left-0 w-full bg-white shadow-md z-20">
+            <div className="flex flex-col gap-4 p-6">
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                Home
+              </Link>
+              <Link href="/shop" onClick={() => setIsMobileMenuOpen(false)}>
+                Shop
+              </Link>
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                About
+              </Link>
+              <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
+                Contact
+              </Link>
+              <hr />
+              {user ? (
+                <div className="flex flex-col gap-4">
+                  <Link href="/profile" className="flex items-center gap-2">
+                    <User size={18} />
+                    <span>{user.name}</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 bg-red-500 hover:bg-red-600 transition text-white rounded-md"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link href="/auth/login">
+                  <button className="w-full px-8 py-2 bg-indigo-500 hover:bg-indigo-600 transition text-white rounded-md">
+                    Login
+                  </button>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       <hr className="border-gray-300" />
     </nav>
