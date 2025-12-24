@@ -52,6 +52,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q") || "";
   const category = searchParams.get("category");
+  const storeId = searchParams.get("storeId");
   const minPrice = Number(searchParams.get("minPrice") || 0);
   const maxPrice = Number(
     searchParams.get("maxPrice") || Number.MAX_SAFE_INTEGER
@@ -69,6 +70,7 @@ export async function GET(req) {
   }
 
   const filter = {
+    ...(storeId ? { store: storeId } : {}),
     ...(category ? { category } : {}),
     ...(q
       ? {

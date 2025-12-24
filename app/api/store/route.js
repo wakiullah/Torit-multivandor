@@ -11,7 +11,7 @@ export async function GET(req) {
   await dbConnect();
 
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get("token")?.value;
 
     if (!token) {
@@ -57,7 +57,7 @@ export async function POST(req) {
 
   try {
     // 1. Get user from token
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get("token")?.value;
 
     if (!token) {

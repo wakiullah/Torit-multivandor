@@ -3,7 +3,7 @@ import Store from "@/lib/models/Store";
 import { NextResponse } from "next/server";
 
 export async function GET(request, { params }) {
-  const { storeId } = params;
+  const { storeId } = await params;
 
   if (!storeId) {
     return NextResponse.json(

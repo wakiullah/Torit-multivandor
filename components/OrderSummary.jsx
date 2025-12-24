@@ -4,11 +4,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import AddressModal from "./AddressModal";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { applyCoupon, removeCoupon, clearCart, selectCoupon, selectDiscount, selectCartItems } from "@/lib/features/cart/cartSlice";
 
-const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
+const OrderSummary = ({ totalPrice, totalDiscount }) => {
   const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
-
   const router = useRouter();
+  const dispatch = useDispatch();
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [user, setUser] = useState(null); // To store logged-in user info
   const [deliveryAddress, setDeliveryAddress] = useState(null);
@@ -16,27 +18,28 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [storeLocationId, setStoreLocationId] = useState(null);
   const [couponCodeInput, setCouponCodeInput] = useState("");
-  const [coupon, setCoupon] = useState("");
+
+  const items = useSelector(selectCartItems);
+  const coupon = useSelector(selectCoupon);
+  const discount = useSelector(selectDiscount);
+  const { status, error } = useSelector((state) => state.cart);
 
   useEffect(() => {
     async function loadAddress() {
       if (showAddressModal) return;
 
-      // Try to get logged-in user data
       try {
         const userRes = await fetch("/api/auth/me");
         if (userRes.ok) {
           const userData = await userRes.json();
-          setUser(userData); // Set user state
+          setUser(userData);
 
-          // Fetch address for the logged-in user
           const addressRes = await fetch(`/api/address?userId=${userData.id}`);
           if (addressRes.ok) {
             const addressData = await addressRes.json();
             setDeliveryAddress(addressData);
           }
         } else {
-          // Not logged in, load from localStorage
           const savedAddress = localStorage.getItem("guestAddress");
           if (savedAddress) {
             setDeliveryAddress(JSON.parse(savedAddress));
@@ -44,7 +47,6 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
         }
       } catch (error) {
         console.error("Error loading user or address:", error);
-        // Fallback for guest
         try {
           const savedAddress = localStorage.getItem("guestAddress");
           if (savedAddress) {
@@ -60,7 +62,21 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
 
   const handleCouponCode = async (event) => {
     event.preventDefault();
+    if (!couponCodeInput) {
+      toast.error("Please enter a coupon code.");
+      return;
+    }
+    dispatch(applyCoupon({ code: couponCodeInput, cartItems: items }));
   };
+
+  useEffect(() => {
+    if (status === 'succeeded') {
+      toast.success('Coupon applied successfully!');
+    } else if (status === 'failed') {
+      toast.error(error);
+    }
+  }, [status, error]);
+
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
@@ -70,11 +86,68 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
       return;
     }
 
-    // Here you would proceed with the order, including the delivery charge
-    router.push("/orders");
+    let orderItems = items.map((item) => ({
+      productId: item.product._id,
+      name: item.name,
+      image: item.image,
+      quantity: item.quantity,
+      price: item.price,
+      variation: item.variation,
+      store: item.storeId,
+    }));
+
+    if (coupon && discount > 0) {
+      const applicableItems = items.filter(
+        (item) => item.storeId.toString() === coupon.store.toString()
+      );
+
+      if (applicableItems.length > 0) {
+        // Find the most expensive item to apply the discount to
+        const mostExpensiveItem = applicableItems.reduce((max, item) =>
+          item.price > max.price ? item : max
+        );
+
+        orderItems = orderItems.map((item) => {
+          if (item.productId === mostExpensiveItem.product._id) {
+            return {
+              ...item,
+              discountedPrice: item.price - discount,
+              couponApplied: true,
+            };
+          }
+          return item;
+        });
+      }
+    }
+
+    const orderData = {
+      items: orderItems,
+      deliveryAddress,
+      paymentMethod,
+      totalPrice,
+      totalDiscount: discount,
+      deliveryCharge,
+      coupon: coupon?._id,
+    };
+
+    return fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderData),
+    }).then(async (response) => {
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to place order.");
+      }
+      dispatch(clearCart());
+      const redirectOrderId = result.parentOrder?._id || result.orders[0]?._id;
+      if (redirectOrderId) {
+        router.push(`/orders/success/${redirectOrderId}`);
+      }
+      return result;
+    });
   };
 
-  // Calculate delivery charge when address or items change
   const calculateDeliveryCharge = useCallback(async () => {
     if (!deliveryAddress?.street || items.length === 0) {
       setDeliveryCharge(0);
@@ -83,18 +156,17 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
 
     let currentStoreLocationId = storeLocationId;
 
-    // 1. Get Store Location ID if not already fetched
     if (!currentStoreLocationId) {
       try {
         const storeId = items[0].storeId;
-        if (!storeId) return; // Exit if no storeId on cart item
+        if (!storeId) return;
         const storeRes = await fetch(`/api/store/${storeId}`);
         const storeData = await storeRes.json();
         if (storeData.success) {
           currentStoreLocationId = storeData.store.location;
-          setStoreLocationId(currentStoreLocationId); // Cache it in state
+          setStoreLocationId(currentStoreLocationId);
         } else {
-          return; // Could not get store location
+          return;
         }
       } catch (error) {
         console.error("Failed to fetch store location", error);
@@ -102,7 +174,6 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
       }
     }
 
-    // 2. Get Customer Location ID from address street name
     let customerLocId;
     try {
       const customerLocationRes = await fetch(
@@ -118,7 +189,6 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
       console.error("Failed to fetch customer location by name", error);
     }
 
-    // 3. Calculate Charge
     if (currentStoreLocationId && customerLocId) {
       const res = await fetch(
         `/api/delivery-charges/calculate?from=${currentStoreLocationId}&to=${customerLocId}`
@@ -186,7 +256,7 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
             {totalDiscount > 0 && (
               <p className="text-green-600">Total Savings:</p>
             )}
-            {coupon && <p>Coupon:</p>}
+            {coupon && <p>Coupon Discount:</p>}
           </div>
           <div className="flex flex-col gap-1 font-medium text-right">
             <p>
@@ -204,19 +274,16 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
               </p>
             )}
             {coupon && (
-              <p>{`-${currency}${((coupon.discount / 100) * totalPrice).toFixed(
-                2
-              )}`}</p>
+              <p className='text-green-600'>
+                -{currency}
+                {discount.toLocaleString()}
+              </p>
             )}
           </div>
         </div>
         {!coupon ? (
           <form
-            onSubmit={(e) =>
-              toast.promise(handleCouponCode(e), {
-                loading: "Checking Coupon...",
-              })
-            }
+            onSubmit={handleCouponCode}
             className="flex justify-center gap-3 mt-3"
           >
             <input
@@ -226,8 +293,12 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
               placeholder="Coupon Code"
               className="border border-slate-400 p-1.5 rounded w-full outline-none"
             />
-            <button className="bg-slate-600 text-white px-3 rounded hover:bg-slate-800 active:scale-95 transition-all">
-              Apply
+            <button
+              type="submit"
+              disabled={status === 'loading'}
+              className="bg-slate-600 text-white px-3 rounded hover:bg-slate-800 active:scale-95 transition-all disabled:bg-slate-400"
+            >
+              {status === 'loading' ? 'Applying...' : 'Apply'}
             </button>
           </form>
         ) : (
@@ -241,7 +312,7 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
             <p>{coupon.description}</p>
             <XIcon
               size={18}
-              onClick={() => setCoupon("")}
+              onClick={() => dispatch(removeCoupon())}
               className="hover:text-red-700 transition cursor-pointer"
             />
           </div>
@@ -254,13 +325,17 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
           {(
             totalPrice +
             deliveryCharge -
-            (coupon ? (coupon.discount / 100) * totalPrice : 0)
+            discount
           ).toLocaleString()}
         </p>
       </div>
       <button
         onClick={(e) =>
-          toast.promise(handlePlaceOrder(e), { loading: "placing Order..." })
+          toast.promise(handlePlaceOrder(e), {
+            loading: "Placing Order...",
+            success: "Order placed successfully!",
+            error: (err) => err.toString(),
+          })
         }
         className="w-full bg-slate-700 text-white py-2.5 rounded hover:bg-slate-900 active:scale-95 transition-all"
       >
@@ -278,3 +353,4 @@ const OrderSummary = ({ totalPrice, items, totalDiscount }) => {
 };
 
 export default OrderSummary;
+

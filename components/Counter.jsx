@@ -10,6 +10,8 @@ import { useDispatch, useSelector } from "react-redux";
 const Counter = ({ cartItemId }) => {
   const dispatch = useDispatch();
   const item = useSelector((state) => state.cart.cartItems[cartItemId]);
+  console.log("cartItemId in Counter:", cartItemId);
+  console.log("cart items", item);
 
   // If item is not in cart, don't render the counter
   if (!item) {

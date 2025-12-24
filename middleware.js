@@ -15,7 +15,9 @@ export async function middleware(req) {
     pathname.startsWith("/api/products");
   const isUserRoute =
     pathname.startsWith("/profile") || pathname.startsWith("/orders");
-
+  const isOrderApiRoute =
+    pathname.startsWith("/api/order/place") ||
+    pathname.startsWith("/api/order/userorders");
   const protectedRoutes = [
     "/admin",
     "/store",
@@ -24,6 +26,8 @@ export async function middleware(req) {
     "/create-store",
     "/api/store",
     "/api/products",
+    "/api/order/place",
+    "/api/order/userorders",
   ];
 
   const isProtectedRoute = protectedRoutes.some((route) =>
@@ -145,6 +149,10 @@ export async function middleware(req) {
       }
 
       if (isVendorRoute && role !== "vendor") {
+        return NextResponse.redirect(new URL("/", req.url));
+      }
+
+      if (isOrderApiRoute && role !== "user") {
         return NextResponse.redirect(new URL("/", req.url));
       }
 

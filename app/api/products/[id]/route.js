@@ -1,52 +1,123 @@
 import dbConnect from "@/lib/dbConnect";
 import Product from "@/lib/models/Product";
-import mongoose from "mongoose";
+import User from "@/lib/models/user";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req, { params }) {
-  await dbConnect();
-  const { id } = params;
-  if (!mongoose.isValidObjectId(id))
-    return new Response("Invalid id", { status: 400 });
-  const doc = await Product.findById(id).lean();
-  if (!doc) return new Response("Not found", { status: 404 });
-  return Response.json(doc);
+// Helper function to get storeId from authenticated user
+async function getStoreIdFromAuth() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token");
+
+  if (!token) {
+    return { error: "Not authorized", status: 401 };
+  }
+
+  try {
+    const decoded = jwt.verify(token.value, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return { error: "User not found", status: 404 };
+    }
+
+    if (user.role !== "vendor" || !user.store) {
+      return {
+        error: "Unauthorized: Only vendors can perform this action",
+        status: 403,
+      };
+    }
+
+    return { storeId: user.store.toString() };
+  } catch (error) {
+    return { error: "Not authorized", status: 401 };
+  }
 }
 
 export async function PUT(req, { params }) {
   await dbConnect();
   const { id } = params;
-  if (!mongoose.isValidObjectId(id))
-    return new Response("Invalid id", { status: 400 });
-  const payload = await req.json();
-  // Only validate price against MRP if the product does not have variations
-  if (!payload.variations || payload.variations.length === 0) {
-    if (
-      payload.price != null &&
-      payload.mrp != null &&
-      Number(payload.price) > Number(payload.mrp)
-    ) {
-      return new Response(
-        JSON.stringify({ message: "Price cannot exceed MRP" }),
-        { status: 400 }
+  const { storeId, error, status } = await getStoreIdFromAuth();
+
+  if (error) {
+    return NextResponse.json({ message: error }, { status });
+  }
+
+  try {
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return NextResponse.json(
+        { message: "Product not found" },
+        { status: 404 }
       );
     }
+
+    // Check if the authenticated user's store owns this product
+    if (product.store.toString() !== storeId) {
+      return NextResponse.json(
+        { message: "Forbidden: You do not own this product" },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+
+    // Toggle inStock status
+    if (typeof body.inStock === "boolean") {
+      product.inStock = body.inStock;
+    }
+
+    await product.save();
+    return NextResponse.json({ success: true, product });
+  } catch (err) {
+    console.error("Update product error:", err);
+    return NextResponse.json(
+      { message: "Failed to update product", error: err.message },
+      { status: 500 }
+    );
   }
-  const updated = await Product.findByIdAndUpdate(id, payload, {
-    new: true,
-    runValidators: true,
-  });
-  if (!updated) return new Response("Not found", { status: 404 });
-  return Response.json(updated);
 }
 
-export async function DELETE(_req, { params }) {
+export async function DELETE(req, { params }) {
   await dbConnect();
   const { id } = params;
-  if (!mongoose.isValidObjectId(id))
-    return new Response("Invalid id", { status: 400 });
-  const deleted = await Product.findByIdAndDelete(id);
-  if (!deleted) return new Response("Not found", { status: 404 });
-  return Response.json({ ok: true });
+  const { storeId, error, status } = await getStoreIdFromAuth();
+
+  if (error) {
+    return NextResponse.json({ message: error }, { status });
+  }
+
+  try {
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return NextResponse.json(
+        { message: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    if (product.store.toString() !== storeId) {
+      return NextResponse.json(
+        { message: "Forbidden: You do not own this product" },
+        { status: 403 }
+      );
+    }
+
+    await Product.findByIdAndDelete(id);
+    return NextResponse.json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (err) {
+    console.error("Delete product error:", err);
+    return NextResponse.json(
+      { message: "Failed to delete product", error: err.message },
+      { status: 500 }
+    );
+  }
 }
