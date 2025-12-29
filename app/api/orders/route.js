@@ -39,6 +39,7 @@ export async function GET(req) {
       isParent: { $ne: true }, // Parent orders বাদ দিয়ে শুধু actual orders
     })
       .populate("items.product")
+      .populate("deliveryMan", "name phone vehicleType")
       .sort({ createdAt: -1 });
 
     return NextResponse.json({ orders }, { status: 200 });

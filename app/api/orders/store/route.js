@@ -9,7 +9,7 @@ export async function GET(req) {
   try {
     await dbConnect();
 
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get("token")?.value;
 
     if (!token) {
@@ -28,6 +28,7 @@ export async function GET(req) {
 
     const orders = await Order.find({ store: store._id })
       .populate("user", "name email")
+      .populate("deliveryMan", "name phone vehicleType")
       .sort({
       createdAt: -1,
     });

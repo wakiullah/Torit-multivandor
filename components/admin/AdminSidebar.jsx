@@ -7,6 +7,7 @@ import {
   StoreIcon,
   TicketPercentIcon,
   TruckIcon,
+  BikeIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -24,6 +25,11 @@ const AdminSidebar = () => {
       name: "Delivery Charge",
       href: "/admin/delivery-charge",
       icon: TruckIcon,
+    },
+    {
+      name: "Delivery Management",
+      href: "/admin/delivery",
+      icon: BikeIcon,
     },
   ];
 
